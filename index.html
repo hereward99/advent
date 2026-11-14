@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ceefax Advent Calendar</title>
+<style>
+:root{color-scheme:dark;--page:#0b0b0b;--ink:#c8c8c8;--ff:"Lucida Console","DejaVu Sans Mono",Menlo,Consolas,"Courier New",monospace;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html,body{margin:0;min-height:100%;background:var(--page);color:var(--ink)}
+body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:10px;box-sizing:border-box;font-family:var(--ff)}
+#tv{width:min(96vw,720px,calc((100dvh - 190px)*1.3333));background:#000;border:6px solid #262626;border-radius:16px;overflow:hidden;font-family:var(--ff);font-weight:bold}
+.r{height:var(--rh);overflow:hidden;font-size:var(--fs);line-height:var(--rh)}
+.r.dh{height:calc(var(--rh)*2)}
+.in{height:var(--rh);white-space:pre}
+.dh .in{transform:scaleY(2);transform-origin:0 0}
+.s{display:inline-block;height:var(--rh);white-space:pre}
+.bl{animation:bl 1s steps(1) infinite}
+@keyframes bl{50%{opacity:.15}}
+@media (prefers-reduced-motion:reduce){.bl{animation:none}}
+[data-p],[data-k],[data-o]{cursor:pointer}
+#pad{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;max-width:720px}
+#pad button{font:bold 18px var(--ff);min-width:40px;height:38px;background:#000;color:#0ff;border:2px solid #0ff;border-radius:4px;cursor:pointer}
+#pad button.k{color:#000;border-color:#000}
+#pad button:focus-visible{outline:3px solid #fff;outline-offset:2px}
+p{margin:0;font-size:13px;text-align:center;max-width:620px;line-height:1.4}
+</style>
+</head>
+<body>
+<div id="tv"><div id="hd"></div><div id="bd"></div><div id="ft"></div><div id="pr"></div></div>
+<div id="pad" aria-label="Page number keypad"></div>
+<p>Type a page number from 100 to 124, tap a door, or use the colour keys: red for the index, green for previous, yellow for next, cyan to reveal.</p>
+<script>
+const C={k:'#000',r:'#f00',g:'#0f0',y:'#ff0',b:'#00f',m:'#f0f',c:'#0ff',w:'#fff'};
+const W=40, Y=2026, FF='"Lucida Console","DejaVu Sans Mono",Menlo,Consolas,"Courier New",monospace';
+const preview=location.hash==='#preview';
+const DN=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const D=[
+['f','The first Christmas card','The first commercial Christmas card was sent in London in 1843. Sir Henry Cole commissioned it, and about 1,000 copies were printed.'],
+['j','Breakfast time','What do snowmen eat for breakfast?','Snowflakes!'],
+['q','Tree trivia','Which country is credited with starting the tradition of the indoor Christmas tree?',['France','Germany','Sweden','Italy'],1],
+['a','Unscramble the word','KIGNSTOC','STOCKING'],
+['f','About Ceefax','Ceefax launched on the BBC in 1974 and closed in October 2012. Millions read it in eight colours on a 40 column grid, just like this.'],
+['j','Pop star turkey','Why was the turkey in the pop group?','Because it had the drumsticks!'],
+['q','Twelve days','What do you get on the eighth day of Christmas?',['Swans a-swimming','Maids a-milking','Pipers piping','Ladies dancing'],1],
+['f','Rudolph','Rudolph the Red-Nosed Reindeer was created in 1939 by Robert L. May for the US department store Montgomery Ward.'],
+['a','Unscramble the word','LYHOL','HOLLY'],
+['j','Summer snowman','What do you call a snowman in July?','A puddle!'],
+['f','The royal broadcast','The first televised Christmas message from the monarch was given by Queen Elizabeth II in 1957.'],
+['q','Under the plant','Which plant is traditionally hung up to kiss under?',['Holly','Ivy','Mistletoe','Poinsettia'],2],
+['j','Santa at school','Why did Santa go to music school?','To improve his wrapping skills!'],
+['f','Poinsettias','The poinsettia, a popular Christmas plant, is native to Mexico.'],
+['a','Unscramble the word','RECKCAR','CRACKER'],
+['q','A Christmas Carol','Who wrote A Christmas Carol, published in 1843?',['Thomas Hardy','Charles Dickens','Jane Austen','Lewis Carroll'],1],
+['f','Tracking Santa','NORAD has tracked Santa every Christmas Eve since 1955, after a misprinted phone number in an advert sent children calling a military command.'],
+['j','Vampire snowman','What do you get if you cross a snowman with a vampire?','Frostbite!'],
+['q','The sleigh team','In the poem A Visit from St Nicholas, how many reindeer pull the sleigh?',['Six','Eight','Nine','Twelve'],1],
+['a','Unscramble the word','RYKTUE','TURKEY'],
+['f','The longest night','The winter solstice, the shortest day in the northern hemisphere, falls around 21 December. After that the days slowly get longer.'],
+['j','Good King Wenceslas','How does Good King Wenceslas like his pizza?','Deep pan, crisp and even!'],
+['q','Silent Night','In which country was the carol Silent Night first performed, in 1818?',['Germany','Austria','Switzerland','Poland'],1],
+['f','Merry Christmas!','Thank you for reading Ceefax Advent. Merry Christmas from all of us, and a happy new year!']
+];
+const tv=document.getElementById('tv'),hd=document.getElementById('hd'),bd=document.getElementById('bd'),ft=document.getElementById('ft'),pr=document.getElementById('pr');
+const S={p:100,rev:false,pick:null,buf:'',msg:''};
+const isOpen=n=>preview||Date.now()>=new Date(Y,11,n).getTime();
+const todayN=()=>{const d=new Date();return d.getFullYear()===Y&&d.getMonth()===11&&d.getDate()<=24?d.getDate():0};
+const sg=(t,f='w',b='k',at='',bl=false)=>({t,f,b,at,bl});
+const row=(a,dh=false)=>({a,dh});
+const bar=(t,f,b)=>sg(t+' '.repeat(Math.max(0,W-t.length)),f,b);
+const esc=t=>t.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const z=x=>String(x).padStart(2,'0');
+function wrap(t,n=36){const o=[];let l='';for(const w of t.split(' ')){if((l+' '+w).trim().length>n){o.push(l);l=w}else l=(l+' '+w).trim()}if(l)o.push(l);return o}
+function html(r){let len=0,h='';for(const s of r.a){len+=s.t.length;h+=`<span class="s${s.bl?' bl':''}" ${s.at} style="color:${C[s.f]};background:${C[s.b]}">${esc(s.t)}</span>`}
+ if(len<W)h+=`<span class="s">${' '.repeat(W-len)}</span>`;
+ return `<div class="r${r.dh?' dh':''}"><div class="in">${h}</div></div>`}
+
+function body(){
+ const p=S.p,n=p-100,R=[],blank=()=>R.push(row([])),line=(t,f='w')=>R.push(row([sg(' '+t.toUpperCase(),f)]));
+ const title=t=>R.push(row([bar(' '+t.toUpperCase(),'y','b')],true));
+ if(p===100){
+  title('Ceefax Advent');blank();
+  line('Choose a door, or type a page number.');blank();
+  const tn=todayN();
+  for(let tr=0;tr<4;tr++){for(let sub=0;sub<3;sub++){const a=[sg('  ')];
+   for(let tc=0;tc<6;tc++){const k=tr*6+tc+1,lock=!isOpen(k),td=tn===k;
+    a.push(sg(sub===1?' '+z(k)+'  ':'     ',lock?'c':'k',td?'y':lock?'b':'g',`data-p="${100+k}"`,td&&sub===1),sg(' '))}
+   R.push(row(a))}blank()}
+  const m=preview?'Preview mode: all doors open':tn?'Today’s door is number '+tn:Date.now()<new Date(Y,11,1)?'The first door opens on 1 December':'All doors are now open';
+  line(m,'m');
+ }else{
+  const d=D[n-1];
+  title(isOpen(n)?d[1]:'Door '+n);
+  if(!isOpen(n)){
+   line('Door '+z(n)+' is still shut.','c');blank();
+   wrap('This page has not been transmitted yet. It opens on '+n+' December.').forEach(l=>line(l));blank();
+   const k=Math.ceil((new Date(Y,11,n)-Date.now())/864e5);line(k+(k===1?' day':' days')+' to go','g');
+   return R;
+  }
+  const lab={f:'Did you know?',j:'Joke of the day',q:'Trivia quiz',a:'Anagram'}[d[0]];
+  line('Door '+z(n)+'  '+lab,'c');blank();
+  if(d[0]==='f'){wrap(d[2]).forEach(l=>line(l));
+   if(n===24){blank();const cx=a=>' '.repeat(Math.floor((W-a)/2));
+    R.push(row([sg(cx(1)),sg(' ','k','y')]));
+    for(const w of [3,5,7,9])R.push(row([sg(cx(w)),sg(' '.repeat(w),'k','g')]));
+    R.push(row([sg(cx(3)),sg('   ','k','r')]))}}
+  if(d[0]==='j'){wrap(d[2]).forEach(l=>line(l));blank();
+   if(S.rev)wrap(d[3]).forEach(l=>line(l,'y'));else line('Press cyan or C for the punchline','g')}
+  if(d[0]==='q'){wrap(d[2]).forEach(l=>line(l));blank();
+   d[3].forEach((o,i)=>{const done=S.pick!==null,tc=done?(i===d[4]?'g':i===S.pick?'r':'w'):'w',at=`data-o="${i}"`;
+    R.push(row([sg(' '),sg(' '+'ABCD'[i]+' ','k','rgyc'[i],at),sg(' '+o.toUpperCase(),tc,'k',at)]))});
+   blank();
+   if(S.pick!==null)S.pick===d[4]?line('Correct! Well done.','g'):line('Not quite. The answer is '+'ABCD'[d[4]]+'.','r');
+   else line('Press A, B, C or D','g')}
+  if(d[0]==='a'){line('Unscramble these letters:');blank();
+   R.push(row([sg(' '+d[2].split('').join(' '),'y')],true));blank();
+   if(S.rev)R.push(row([sg(' '+d[3].split('').join(' '),'g')],true));else line('Press cyan or C for the answer','g')}
+ }
+ return R;
+}
+function render(){
+ const R=body();let used=0;R.forEach(r=>used+=r.dh?2:1);
+ while(used<22){R.push(row([]));used++}
+ bd.innerHTML=R.map(html).join('');
+ const d=S.p>100?D[S.p-101]:null,act=d&&isOpen(S.p-100)&&d[0]!=='f';
+ const fk=(t,b,k)=>sg((' '+t+' '.repeat(10)).slice(0,10),'k',b,`data-k="${k}"`);
+ ft.innerHTML=html(row([fk('INDEX','r','r'),fk('PREVIOUS','g','g'),fk('NEXT','y','y'),act?fk('REVEAL','c','c'):sg(' '.repeat(10))]));
+ pr.innerHTML=html(row([sg(' '+(S.msg||(preview?'PREVIEW MODE: ALL DOORS OPEN':'TYPE 100-124 OR USE COLOUR KEYS')),S.msg?'r':'c')]));
+ head();
+}
+function head(){const d=new Date(),pg=S.buf?(S.buf+'---').slice(0,3):S.p;
+ hd.innerHTML=html(row([sg('P'+pg),sg(' ADVENT '+S.p+' '),sg(`${DN[d.getDay()]} ${z(d.getDate())} ${MN[d.getMonth()]} ${z(d.getHours())}:${z(d.getMinutes())}/${z(d.getSeconds())}`,'y')]))}
+function go(p){S.p=p;S.rev=false;S.pick=null;S.buf='';S.msg='';render()}
+function flash(m){S.msg=m;S.buf='';render();setTimeout(()=>{S.msg='';render()},1500)}
+function digit(c){S.buf+=c;if(S.buf.length<3){head();return}const n=+S.buf;S.buf='';n>=100&&n<=124?go(n):flash('NO SUCH PAGE')}
+function reveal(){if(S.p<101||!isOpen(S.p-100))return;const d=D[S.p-101];if(d[0]==='q')S.pick=d[4];else if(d[0]!=='f')S.rev=true;render()}
+function answer(i){if(S.pick===null){S.pick=i;render()}}
+function key(k){if(k==='r')go(100);else if(k==='g')go(S.p<=100?124:S.p-1);else if(k==='y')go(S.p>=124?100:S.p+1);else if(k==='c')reveal()}
+tv.addEventListener('click',e=>{const t=e.target.closest('[data-p],[data-k],[data-o]');if(!t)return;
+ if(t.dataset.p)go(+t.dataset.p);else if(t.dataset.k)key(t.dataset.k);else answer(+t.dataset.o)});
+document.addEventListener('keydown',e=>{if(e.metaKey||e.ctrlKey||e.altKey)return;const k=e.key.toLowerCase();
+ if(/^\d$/.test(k))digit(k);else if('rgyc'.includes(k)&&k.length===1)key(k);
+ else if('abcd'.includes(k)&&k.length===1&&S.p>100&&D[S.p-101][0]==='q'&&isOpen(S.p-100))answer('abcd'.indexOf(k));
+ else if(k==='escape'||k==='backspace'){S.buf='';head()}});
+const pad=document.getElementById('pad');
+[...'1234567890'].forEach(d=>{const b=document.createElement('button');b.textContent=d;b.onclick=()=>digit(d);pad.appendChild(b)});
+[['r','#f00'],['g','#0f0'],['y','#ff0'],['c','#0ff']].forEach(([k,c])=>{const b=document.createElement('button');b.className='k';b.textContent=k.toUpperCase();b.style.background=c;b.onclick=()=>key(k);pad.appendChild(b)});
+function fit(){const w=tv.clientWidth,cv=document.createElement('canvas').getContext('2d');cv.font='100px '+FF;
+ const em=cv.measureText('M').width/100,cw=w/W;
+ document.documentElement.style.setProperty('--fs',(cw/em)+'px');document.documentElement.style.setProperty('--rh',(cw*1.2)+'px')}
+fit();render();addEventListener('resize',()=>{fit();render()});setInterval(head,1000);
+</script>
+</body>
+</html>
